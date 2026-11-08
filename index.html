@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Entre Trazos ❤️</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <!-- PeerJS para conexión directa en tiempo real sin backend -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <!-- Google Fonts & Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { font-family: 'Outfit', sans-serif; background-color: #fdf8f6; color: #2d3748; overflow-x: hidden; user-select: none; -webkit-user-select: none; }
+    .pastel-pink { background-color: #ffe4e6; }
+    .pastel-lavender { background-color: #ede9fe; }
+    .pastel-cream { background-color: #fef3c7; }
+    .pastel-blue { background-color: #e0f2fe; }
+    canvas { touch-action: none; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between max-w-md mx-auto relative shadow-2xl bg-white">
+
+  <!-- PANTALLA DE AUTENTICACIÓN / VINCULACIÓN -->
+  <div id="auth-screen" class="absolute inset-0 z-50 bg-white p-6 flex flex-col justify-center items-center text-center">
+    <div class="w-20 h-20 rounded-full pastel-pink flex items-center justify-center text-rose-500 text-3xl mb-4 shadow-inner">
+      <i class="fa-solid fa-heart"></i>
+    </div>
+    <h1 class="text-3xl font-bold text-gray-800 tracking-tight">Entre Trazos</h1>
+    <p class="text-gray-500 text-sm mt-1 mb-8">Un universo creativo privado para dos.</p>
+
+    <div id="auth-forms" class="w-full space-y-4">
+      <div class="bg-rose-50 p-4 rounded-2xl border border-rose-100 text-left">
+        <label class="block text-xs font-bold text-rose-600 uppercase mb-1">Tu Nombre o Apodo</label>
+        <input type="text" id="user-name" placeholder="Ej: Nayara o Elba" class="w-full p-3 bg-white rounded-xl border border-rose-200 focus:outline-none focus:ring-2 focus:ring-rose-400 text-sm">
+      </div>
+
+      <button onclick="createCoupleSpace()" class="w-full bg-rose-500 text-white font-semibold py-3.5 px-4 rounded-2xl shadow-lg shadow-rose-200 active:scale-95 transition text-sm">
+        Crear Código de Pareja
+      </button>
+
+      <div class="relative flex py-2 items-center">
+        <div class="flex-grow border-t border-gray-200"></div>
+        <span class="flex-shrink mx-4 text-gray-400 text-xs uppercase">o unirse</span>
+        <div class="flex-grow border-t border-gray-200"></div>
+      </div>
+
+      <div class="bg-purple-50 p-4 rounded-2xl border border-purple-100 text-left">
+        <label class="block text-xs font-bold text-purple-600 uppercase mb-1">Código Privado de Pareja</label>
+        <input type="text" id="couple-code-input" placeholder="Ej: TRZ-8942" class="w-full p-3 bg-white rounded-xl border border-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-400 text-sm uppercase">
+        <button onclick="joinCoupleSpace()" class="w-full mt-3 bg-purple-600 text-white font-semibold py-3 rounded-xl shadow-md active:scale-95 transition text-sm">
+          Conectar con mi Pareja ❤️
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PANTALLA PRINCIPAL (DASHBOARD) -->
+  <div id="main-screen" class="hidden flex-1 flex flex-col p-5 pb-24">
+    <!-- Header -->
+    <header class="flex justify-between items-center mb-6">
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-full pastel-pink flex items-center justify-center font-bold text-rose-600 text-lg shadow-sm" id="user-avatar-display">N</div>
+        <div>
+          <h2 class="text-xs text-gray-400 font-medium">Espacio Compartido</h2>
+          <h1 class="text-lg font-bold text-gray-800" id="welcome-title">Hola ❤️</h1>
+        </div>
+      </div>
+    </header>
+
+    <!-- Estado de Conexión y Código -->
+    <div class="pastel-lavender p-4 rounded-2xl mb-6 flex items-center justify-between border border-purple-100 shadow-sm">
+      <div>
+        <span class="text-xs font-bold text-purple-600 uppercase tracking-wider">Código de Pareja</span>
+        <div class="text-lg font-mono font-bold text-purple-900" id="display-couple-code">---</div>
+      </div>
+      <div class="flex items-center gap-2 bg-white/80 px-3 py-1.5 rounded-full shadow-xs">
+        <span id="status-indicator" class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+        <span id="status-text" class="text-xs font-semibold text-amber-700">Esperando...</span>
+      </div>
+    </div>
+
+    <!-- Acciones Principales -->
+    <div class="grid grid-cols-2 gap-4 mb-6">
+      <button onclick="openCanvas('free')" class="pastel-pink p-5 rounded-3xl text-left flex flex-col justify-between h-36 border border-rose-100 shadow-xs active:scale-95 transition">
+        <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-rose-500 shadow-xs">
+          <i class="fa-solid fa-paintbrush text-lg"></i>
+        </div>
+        <div>
+          <h3 class="font-bold text-gray-800 text-base">Dibujo Libre</h3>
+          <p class="text-xs text-gray-500 mt-0.5">Crea y edita sin límites</p>
+        </div>
+      </button>
+
+      <button onclick="openCanvas('together')" class="pastel-blue p-5 rounded-3xl text-left flex flex-col justify-between h-36 border border-sky-100 shadow-xs active:scale-95 transition">
+        <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-sky-500 shadow-xs">
+          <i class="fa-solid fa-users text-lg"></i>
+        </div>
+        <div>
+          <h3 class="font-bold text-gray-800 text-base">Dibujar Juntos</h3>
+          <p class="text-xs text-gray-500 mt-0.5">Tiempo real a dos manos</p>
+        </div>
+      </button>
+    </div>
+
+    <!-- Galería Local -->
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="font-bold text-gray-800 text-sm uppercase tracking-wider">Tus Dibujos ❤️</h3>
+    </div>
+    
+    <div id="recent-drawings-container" class="space-y-3 flex-1 overflow-y-auto">
+      <div class="p-4 bg-gray-50 rounded-2xl text-center text-gray-400 text-xs">
+        No hay dibujos guardados aún.
+      </div>
+    </div>
+  </div>
+
+  <!-- ESTUDIO DE DIBUJO (CANVAS) -->
+  <div id="canvas-screen" class="hidden absolute inset-0 z-40 bg-white flex flex-col justify-between p-4">
+    <div class="flex justify-between items-center py-2">
+      <button onclick="closeCanvas()" class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-700">
+        <i class="fa-solid fa-arrow-left"></i>
+      </button>
+      <input type="text" id="drawing-title" value="Nuestro dibujo de hoy" class="text-center font-bold text-gray-800 bg-transparent border-b border-dashed border-gray-300 focus:outline-none text-sm w-48">
+      <button onclick="saveDrawing()" class="bg-rose-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md shadow-rose-200">
+        Guardar ❤️
+      </button>
+    </div>
+
+    <!-- Lienzo Digital -->
+    <div class="flex-1 flex items-center justify-center relative my-2">
+      <canvas id="paintCanvas" class="w-full aspect-[3/4] max-h-[500px] border border-gray-100"></canvas>
+    </div>
+
+    <!-- Herramientas -->
+    <div class="bg-gray-50 p-4 rounded-3xl border border-gray-100 space-y-3">
+      <!-- Colores -->
+      <div class="flex justify-between items-center gap-1 overflow-x-auto pb-1">
+        <button onclick="setColor('#000000')" class="w-7 h-7 rounded-full bg-black border-2 border-white shadow-xs"></button>
+        <button onclick="setColor('#ef4444')" class="w-7 h-7 rounded-full bg-red-500 border-2 border-white shadow-xs"></button>
+        <button onclick="setColor('#ec4899')" class="w-7 h-7 rounded-full bg-pink-500 border-2 border-white shadow-xs"></button>
+        <button onclick="setColor('#8b5cf6')" class="w-7 h-7 rounded-full bg-purple-500 border-2 border-white shadow-xs"></button>
+        <button onclick="setColor('#3b82f6')" class="w-7 h-7 rounded-full bg-blue-500 border-2 border-white shadow-xs"></button>
+        <button onclick="setColor('#10b981')" class="w-7 h-7 rounded-full bg-emerald-500 border-2 border-white shadow-xs"></button>
+        <button onclick="setColor('#f59e0b')" class="w-7 h-7 rounded-full bg-amber-500 border-2 border-white shadow-xs"></button>
+        <button onclick="setColor('#ffffff')" class="w-7 h-7 rounded-full bg-white border-2 border-gray-300 shadow-xs" title="Goma"></button>
+      </div>
+
+      <!-- Grosor y Botones -->
+      <div class="flex justify-between items-center text-xs text-gray-600 font-medium">
+        <div class="flex items-center gap-2">
+          <span>Grosor:</span>
+          <input type="range" id="brush-size" min="1" max="30" value="5" class="accent-rose-500 w-24">
+        </div>
+        <div class="flex gap-2">
+          <button onclick="addShape('heart')" class="px-3 py-1.5 bg-white rounded-xl shadow-xs border border-gray-200 text-rose-500"><i class="fa-solid fa-heart"></i></button>
+          <button onclick="addShape('star')" class="px-3 py-1.5 bg-white rounded-xl shadow-xs border border-gray-200 text-amber-500"><i class="fa-solid fa-star"></i></button>
+          <button onclick="clearCanvas(true)" class="px-3 py-1.5 bg-white rounded-xl shadow-xs border border-gray-200 text-gray-500"><i class="fa-solid fa-rotate-right"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NAVEGACIÓN INFERIOR -->
+  <nav class="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-100 px-6 py-3 flex justify-between items-center z-30">
+    <button onclick="showScreen('main-screen')" class="flex flex-col items-center text-rose-500">
+      <i class="fa-solid fa-house text-lg"></i>
+      <span class="text-[10px] font-semibold mt-1">Inicio</span>
+    </button>
+    <button onclick="openCanvas('free')" class="flex flex-col items-center text-gray-400 hover:text-rose-500">
+      <i class="fa-solid fa-pen-nib text-lg"></i>
+      <span class="text-[10px] font-semibold mt-1">Dibujar</span>
+    </button>
+  </nav>
+
+  <script>
+    let peer = null;
+    let conn = null;
+    let currentUser = { name: '', code: '' };
+    let canvas, ctx, painting = false, currentColor = '#000000';
+    let lastX = 0, lastY = 0;
+
+    // --- CONEXIÓN PEER-TO-PEER ---
+    function createCoupleSpace() {
+      const name = document.getElementById('user-name').value.trim();
+      if (!name) return alert('Por favor, introduce tu nombre.');
+      
+      const randomId = Math.floor(1000 + Math.random() * 9000);
+      const code = `TRZ-${randomId}`;
+      currentUser = { name, code };
+
+      // El Creador actúa como Servidor PeerJS usando el código formateado
+      const peerId = `entretrazos-${code.toLowerCase()}`;
+      peer = new Peer(peerId);
+
+      peer.on('open', () => {
+        initApp(code);
+      });
+
+      peer.on('connection', (connection) => {
+        conn = connection;
+        setupConnectionEvents();
+      });
+
+      peer.on('error', (err) => {
+        alert('Error al crear el espacio. Inténtalo de nuevo.');
+      });
+    }
+
+    function joinCoupleSpace() {
+      const name = document.getElementById('user-name').value.trim();
+      const code = document.getElementById('couple-code-input').value.trim().toUpperCase();
+      if (!name || !code) return alert('Introduce tu nombre y el código de pareja.');
+
+      currentUser = { name, code };
+      peer = new Peer(); // ID aleatorio para el cliente
+
+      peer.on('open', () => {
+        const targetPeerId = `entretrazos-${code.toLowerCase()}`;
+        conn = peer.connect(targetPeerId);
+        setupConnectionEvents();
+        initApp(code);
+      });
+
+      peer.on('error', (err) => {
+        alert('No se pudo encontrar a tu pareja. Revisa el código introducido.');
+      });
+    }
+
+    function setupConnectionEvents() {
+      conn.on('open', () => {
+        updateConnectionStatus(true);
+      });
+
+      conn.on('data', (data) => {
+        handleIncomingData(data);
+      });
+
+      conn.on('close', () => {
+        updateConnectionStatus(false);
+      });
+    }
+
+    function updateConnectionStatus(isConnected) {
+      const indicator = document.getElementById('status-indicator');
+      const text = document.getElementById('status-text');
+
+      if (isConnected) {
+        indicator.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse';
+        text.className = 'text-xs font-semibold text-emerald-700';
+        text.innerText = 'Conectados';
+      } else {
+        indicator.className = 'w-2.5 h-2.5 rounded-full bg-amber-500';
+        text.className = 'text-xs font-semibold text-amber-700';
+        text.innerText = 'Esperando...';
+      }
+    }
+
+    function initApp(code) {
+      document.getElementById('auth-screen').classList.add('hidden');
+      document.getElementById('main-screen').classList.remove('hidden');
+      document.getElementById('welcome-title').innerText = `Hola, ${currentUser.name} ❤️`;
+      document.getElementById('user-avatar-display').innerText = currentUser.name.charAt(0).toUpperCase();
+      document.getElementById('display-couple-code').innerText = code;
+      loadSavedDrawings();
+    }
+
+    function showScreen(screenId) {
+      document.getElementById('main-screen').classList.add('hidden');
+      document.getElementById('canvas-screen').classList.add('hidden');
+      if (screenId === 'main-screen') document.getElementById('main-screen').classList.remove('hidden');
+    }
+
+    // --- LÓGICA DE DIBUJO ---
+    function openCanvas() {
+      document.getElementById('canvas-screen').classList.remove('hidden');
+      setupCanvas();
+    }
+
+    function closeCanvas() {
+      document.getElementById('canvas-screen').classList.add('hidden');
+    }
+
+    function setupCanvas() {
+      canvas = document.getElementById('paintCanvas');
+      ctx = canvas.getContext('2d');
+      
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Eventos Touch / Mouse
+      canvas.onmousedown = startPosition;
+      canvas.onmouseup = endPosition;
+      canvas.onmousemove = draw;
+
+      canvas.ontouchstart = (e) => { startPosition(e.touches[0]); e.preventDefault(); };
+      canvas.ontouchend = endPosition;
+      canvas.ontouchmove = (e) => { draw(e.touches[0]); e.preventDefault(); };
+    }
+
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: ((e.clientX || e.pageX) - rect.left) / canvas.width,
+        y: ((e.clientY || e.pageY) - rect.top) / canvas.height
+      };
+    }
+
+    function startPosition(e) {
+      painting = true;
+      const pos = getPos(e);
+      lastX = pos.x;
+      lastY = pos.y;
+      draw(e);
+    }
+
+    function endPosition() {
+      painting = false;
+      ctx.beginPath();
+    }
+
+    function draw(e) {
+      if (!painting) return;
+      const pos = getPos(e);
+      const size = document.getElementById('brush-size').value;
+
+      const drawData = {
+        type: 'draw',
+        x0: lastX,
+        y0: lastY,
+        x1: pos.x,
+        y1: pos.y,
+        color: currentColor,
+        size: size
+      };
+
+      // Dibujar localmente
+      renderLine(drawData);
+
+      // Transmitir en tiempo real
+      if (conn && conn.open) {
+        conn.send(drawData);
+      }
+
+      lastX = pos.x;
+      lastY = pos.y;
+    }
+
+    function renderLine(data) {
+      ctx.lineWidth = data.size;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = data.color;
+
+      ctx.beginPath();
+      ctx.moveTo(data.x0 * canvas.width, data.y0 * canvas.height);
+      ctx.lineTo(data.x1 * canvas.width, data.y1 * canvas.height);
+      ctx.stroke();
+      ctx.beginPath();
+    }
+
+    function setColor(color) { currentColor = color; }
+
+    function clearCanvas(broadcast = false) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if (broadcast && conn && conn.open) {
+        conn.send({ type: 'clear' });
+      }
+    }
+
+    function addShape(shape) {
+      const text = shape === 'heart' ? '❤️' : '⭐';
+      ctx.font = '60px Arial';
+      ctx.fillText(text, (canvas.width / 2) - 30, (canvas.height / 2) + 20);
+
+      if (conn && conn.open) {
+        conn.send({ type: 'shape', shape: text });
+      }
+    }
+
+    // --- RECEPCIÓN DE DATOS EN TIEMPO REAL ---
+    function handleIncomingData(data) {
+      if (data.type === 'draw') {
+        renderLine(data);
+      } else if (data.type === 'clear') {
+        clearCanvas(false);
+      } else if (data.type === 'shape') {
+        ctx.font = '60px Arial';
+        ctx.fillText(data.shape, (canvas.width / 2) - 30, (canvas.height / 2) + 20);
+      }
+    }
+
+    // --- ALMACENAMIENTO LOCAL ---
+    function saveDrawing() {
+      const title = document.getElementById('drawing-title').value;
+      const dataURL = canvas.toDataURL('image/png');
+
+      const savedDrawings = JSON.parse(localStorage.getItem('entre_trazos_drawings') || '[]');
+      savedDrawings.unshift({ title, image: dataURL, date: new Date().toLocaleDateString() });
+      localStorage.setItem('entre_trazos_drawings', JSON.stringify(savedDrawings));
+
+      alert('¡Dibujo guardado con éxito! ❤️');
+      closeCanvas();
+      loadSavedDrawings();
+    }
+
+    function loadSavedDrawings() {
+      const savedDrawings = JSON.parse(localStorage.getItem('entre_trazos_drawings') || '[]');
+      const container = document.getElementById('recent-drawings-container');
+
+      if (savedDrawings.length === 0) {
+        container.innerHTML = `<div class="p-4 bg-gray-50 rounded-2xl text-center text-gray-400 text-xs">No hay dibujos guardados aún.</div>`;
+        return;
+      }
+
+      container.innerHTML = savedDrawings.map(d => `
+        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100 shadow-2xs">
+          <div class="flex items-center gap-3">
+            <img src="${d.image}" class="w-12 h-12 rounded-xl object-cover border border-gray-200">
+            <div>
+              <h4 class="font-bold text-gray-800 text-sm">${d.title}</h4>
+              <p class="text-[11px] text-gray-400">${d.date}</p>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+  </script>
+</body>
+</html>
